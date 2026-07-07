@@ -244,8 +244,8 @@ export default function ScorecardApp() {
               </p>
               <GeoChecklist geo={geo} />
               <p className="mt-5 border-t border-sage/50 pt-4 text-[13.5px] leading-snug text-muted">
-                This is your free on-page score. The live check below shows whether AI actually cites
-                you when guests ask.
+                This is your free on-page score. Add your guest questions to run the live check and
+                see whether AI actually cites you.
               </p>
             </div>
 
