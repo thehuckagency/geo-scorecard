@@ -33,7 +33,7 @@ function HeaderBar() {
     <header className="mx-auto flex max-w-5xl items-center justify-between px-5 pb-2 pt-7 sm:px-8">
       <Logo className="h-6 w-auto text-ink sm:h-7" />
       <a
-        href={PUBLIC.bookingUrl}
+        href={PUBLIC.siteUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="group focus-ring inline-flex items-center gap-1.5 rounded-full text-[13px] font-medium text-muted transition-colors hover:text-ink"
