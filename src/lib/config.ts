@@ -95,7 +95,8 @@ export const CONFIG = {
 
 /** Client-safe public URLs (set via NEXT_PUBLIC_ so they can be read anywhere). */
 export const PUBLIC = {
-  bookingUrl: process.env.NEXT_PUBLIC_BOOKING_URL || "https://www.huck.agency",
+  bookingUrl:
+    process.env.NEXT_PUBLIC_BOOKING_URL || "https://calendar.app.google/Eb6QbXhAZZchAwAd6",
   privacyUrl: process.env.NEXT_PUBLIC_PRIVACY_URL || "https://www.huck.agency/privacy",
 } as const;
 
