@@ -60,7 +60,6 @@ export default function ScorecardApp() {
   const [email, setEmail] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [name, setName] = useState("");
-  const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Job / polling
@@ -115,16 +114,13 @@ export default function ScorecardApp() {
         setError("Please enter a valid work email.");
         return;
       }
-      if (!consent) {
-        setError("Please agree to the privacy terms to run the full check.");
-        return;
-      }
       setSubmitting(true);
       try {
         const res = await fetch("/api/scorecard/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ domain, questions: qs, email: email.trim(), businessName, name, consent }),
+          // Consent is given by submitting the form (passive notice below the fields).
+          body: JSON.stringify({ domain, questions: qs, email: email.trim(), businessName, name, consent: true }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Could not start the check.");
@@ -135,7 +131,7 @@ export default function ScorecardApp() {
         setSubmitting(false);
       }
     },
-    [questions, emailValid, consent, domain, email, businessName, name],
+    [questions, emailValid, domain, email, businessName, name],
   );
 
   const beginPolling = useCallback((jobId: string) => {
@@ -281,19 +277,17 @@ export default function ScorecardApp() {
                   <input type="text" autoComplete="organization" aria-label="Hotel or business name (optional)" placeholder="Hotel name (optional)" className="field" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
                   <input type="text" autoComplete="name" aria-label="Your name (optional)" placeholder="Your name (optional)" className="field" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
-                <label className="mt-3 flex cursor-pointer items-start gap-3 text-[13px] leading-snug text-muted">
-                  <input type="checkbox" className="focus-ring mt-0.5 h-[18px] w-[18px] shrink-0 rounded border-sage accent-ink" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-                  <span>
-                    I agree to Huck contacting me about my results and storing my details per the{" "}
-                    <a href={PUBLIC.privacyUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-2 hover:text-gain">privacy policy</a>.
-                  </span>
-                </label>
                 {error && <p role="alert" className="mt-3 text-[13.5px] font-medium text-ink">{error}</p>}
                 <button type="submit" className="btn-primary mt-4 w-full sm:w-auto" disabled={submitting}>
                   {submitting ? "Starting..." : "Send me my full scorecard"}
                 </button>
                 <p className="mt-3 text-[13px] leading-snug text-muted">
                   No spam, no sales pressure. Just your score and a plan you can act on.
+                </p>
+                <p className="mt-2 text-[12px] leading-snug text-muted">
+                  By requesting your scorecard you agree to Huck contacting you about your results,
+                  per our{" "}
+                  <a href={PUBLIC.privacyUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-2 hover:text-gain">privacy policy</a>.
                 </p>
               </div>
             </form>
