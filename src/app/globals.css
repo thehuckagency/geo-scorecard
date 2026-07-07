@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Fraunces";
+  --font-sans: "Zalando Sans";
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-xl border border-sage/70 bg-surface px-4 py-3 text-ink outline-none transition
+           placeholder:text-muted/60 focus:border-ink focus:ring-2 focus:ring-ink/15;
+  }
+
+  .btn-primary {
+    @apply focus-ring inline-flex items-center justify-center rounded-full bg-ink px-6 py-3.5 text-[15px]
+           font-semibold text-paper transition hover:bg-gain disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/25 focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
+  }
+
+  .card {
+    @apply rounded-2xl border border-sage/50 bg-surface/60 shadow-card;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
