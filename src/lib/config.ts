@@ -64,6 +64,9 @@ export const CONFIG = {
     platform: "google",
     locationName: "United Kingdom",
     languageCode: "en",
+    // How many recorded AI responses to sample per question. More = better
+    // competitor stats but higher cost (DataForSEO bills roughly per row).
+    sampleLimit: 40,
   },
 
   // ----- Job lifecycle -----
