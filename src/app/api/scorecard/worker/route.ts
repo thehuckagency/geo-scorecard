@@ -8,7 +8,10 @@ import { postLead } from "@/lib/webhook";
 import type { Job } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // Vercel Pro ceiling
+// 60s works on every Vercel plan (Hobby ceiling). This is plenty for mock mode
+// and Perplexity-only live runs. For live DataForSEO (tasks up to 120s), upgrade
+// the project to Pro and raise this to 300.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET || "dev-internal-secret";
