@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { analyzeGeo } from "@/lib/geo/analyze";
-import { suggestQuestions } from "@/lib/geo/suggest";
+import { CONFIG } from "@/lib/config";
+import { computeGeo, crawlSite } from "@/lib/geo/analyze";
+import { suggestFromPages } from "@/lib/geo/suggest";
 import { normalizeDomain } from "@/lib/normalize";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60; // Firecrawl fallback can add a few seconds
 export const dynamic = "force-dynamic";
 
-/** Synchronous, free Layer 2: on-page GEO readiness for a domain. */
+/** Synchronous, free Layer 2: on-page GEO readiness + tailored question suggestions. */
 export async function POST(req: Request) {
   let body: { domain?: string };
   try {
@@ -21,11 +22,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Please enter a valid website domain." }, { status: 400 });
   }
 
-  // GEO score and tailored question suggestions in parallel (both crawl the
-  // homepage; running them together keeps the free step fast).
-  const [geo, suggestedQuestions] = await Promise.all([
-    analyzeGeo(domain),
-    suggestQuestions(domain),
-  ]);
+  // Crawl once (homepage + key pages), then derive the GEO score and the
+  // tailored questions from the same pages.
+  const site = await crawlSite(domain);
+  if (!site) {
+    return NextResponse.json({
+      domain,
+      geo: {
+        score: 0,
+        maxScore: CONFIG.weights.geoReadiness,
+        analysedUrl: `https://${domain}`,
+        keyPageUrl: null,
+        error: "We could not reach the site to analyse it.",
+        signals: [],
+      },
+      suggestedQuestions: [],
+    });
+  }
+
+  const geo = computeGeo(site.home, site.pages);
+  const suggestedQuestions = suggestFromPages(site.pages);
   return NextResponse.json({ domain, geo, suggestedQuestions });
 }

@@ -1,37 +1,8 @@
 import "server-only";
-import { parse, type HTMLElement } from "node-html-parser";
+import { type HTMLElement } from "node-html-parser";
 import { CONFIG } from "../config";
+import { crawl, type Page } from "../crawl";
 import type { GeoReadiness, GeoSignal } from "../types";
-
-interface Fetched {
-  url: string;
-  root: HTMLElement;
-}
-
-async function fetchHtml(url: string): Promise<Fetched | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CONFIG.geo.fetchTimeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: {
-        "User-Agent": CONFIG.geo.userAgent,
-        Accept: "text/html,application/xhtml+xml",
-      },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const ct = res.headers.get("content-type") || "";
-    if (!ct.includes("html")) return null;
-    const html = await res.text();
-    return { url: res.url || url, root: parse(html) };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /** Collect every JSON-LD @type on a page (handles @graph + arrays + nesting). */
 function jsonLdTypes(root: HTMLElement): Set<string> {
@@ -85,35 +56,37 @@ function questionLikeCount(root: HTMLElement): number {
 }
 
 /**
- * Analyse a domain's on-page GEO readiness. Fetches the homepage and the first
- * key page that resolves, then scores structural signals (a signal counts if
- * present on either page). Total is CONFIG.weights.geoReadiness (20).
+ * Crawl the homepage plus up to two key pages (contact/about for address,
+ * faq/rooms for GEO signals) via the shared crawler (Firecrawl fallback). The
+ * crawled pages are reused for both the GEO score and the question suggestions.
  */
-export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
+export async function crawlSite(domain: string): Promise<{ home: Page; pages: Page[] } | null> {
+  const home = (await crawl(`https://${domain}`)) ?? (await crawl(`http://${domain}`));
+  if (!home) return null;
+
+  const extras: Page[] = [];
+  for (const group of [
+    ["/contact", "/contact-us", "/about"],
+    ["/faq", "/faqs", "/rooms"],
+  ]) {
+    for (const path of group) {
+      const p = await crawl(`https://${domain}${path}`);
+      if (p) {
+        extras.push(p);
+        break;
+      }
+    }
+  }
+  return { home, pages: [home, ...extras] };
+}
+
+/**
+ * Score on-page GEO readiness from already-crawled pages. A signal counts if
+ * present on any page. Total is CONFIG.weights.geoReadiness (20).
+ */
+export function computeGeo(home: Page, pages: Page[]): GeoReadiness {
   const maxScore = CONFIG.weights.geoReadiness;
-  const home =
-    (await fetchHtml(`https://${domain}`)) ?? (await fetchHtml(`http://${domain}`));
-
-  if (!home) {
-    return {
-      score: 0,
-      maxScore,
-      analysedUrl: `https://${domain}`,
-      keyPageUrl: null,
-      error: "We could not reach the site to analyse it.",
-      signals: [],
-    };
-  }
-
-  // First key page that resolves.
-  let keyPage: Fetched | null = null;
-  for (const path of CONFIG.geo.keyPagePaths) {
-    keyPage = await fetchHtml(`https://${domain}${path}`);
-    if (keyPage) break;
-  }
-
-  const pages = [home, keyPage].filter(Boolean) as Fetched[];
-  const anyPage = (fn: (p: Fetched) => boolean) => pages.some(fn);
+  const anyPage = (fn: (p: Page) => boolean) => pages.some(fn);
 
   const types = new Set<string>();
   pages.forEach((p) => jsonLdTypes(p.root).forEach((t) => types.add(t)));
@@ -229,7 +202,23 @@ export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
     score: Math.min(maxScore, score),
     maxScore,
     analysedUrl: home.url,
-    keyPageUrl: keyPage?.url ?? null,
+    keyPageUrl: pages.find((p) => p.url !== home.url)?.url ?? null,
     signals,
   };
+}
+
+/** Crawl a domain and score its GEO readiness (used by the worker). */
+export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
+  const site = await crawlSite(domain);
+  if (!site) {
+    return {
+      score: 0,
+      maxScore: CONFIG.weights.geoReadiness,
+      analysedUrl: `https://${domain}`,
+      keyPageUrl: null,
+      error: "We could not reach the site to analyse it.",
+      signals: [],
+    };
+  }
+  return computeGeo(site.home, site.pages);
 }

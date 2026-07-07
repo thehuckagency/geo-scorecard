@@ -77,6 +77,7 @@ in production.
 | `DATAFORSEO_LOGIN` | server | DataForSEO Basic auth login. |
 | `DATAFORSEO_PASSWORD` | server | DataForSEO Basic auth password. Blank = mock. |
 | `MOCK_MODE` | server | Set to `1` to force synthetic results even with keys. |
+| `FIRECRAWL_API_KEY` | server | Optional. Fallback crawler used only when a plain fetch of the hotel's site is bot-blocked; improves GEO reliability and tailored question suggestions. Direct-only without it. |
 | `UPSTASH_REDIS_REST_URL` | server | Job store (or use Vercel KV's `KV_REST_API_URL`). |
 | `UPSTASH_REDIS_REST_TOKEN` | server | Job store token (or `KV_REST_API_TOKEN`). |
 | `LEAD_WEBHOOK_URL` | server | Where the completed scorecard JSON is POSTed (CRM / Airtable / Zapier). |

@@ -1,14 +1,15 @@
-import "server-only";
-import { parse, type HTMLElement } from "node-html-parser";
-import { CONFIG } from "../config";
+import type { HTMLElement } from "node-html-parser";
+import type { Page } from "../crawl";
 
 /**
- * Derive three tailored guest questions from the hotel's own site, so the intake
- * form is pre-filled with location- and style-specific phrasing instead of
- * generic placeholders. Uses the same lightweight crawl as the GEO check
- * (homepage + a contact/about page, JSON-LD, and title/meta text). If you later
- * want deeper extraction, swap fetchPage for a Firecrawl call that returns clean
- * page text and feed it to the same profile/keyword logic below.
+ * Derive three tailored guest questions from already-crawled pages of the
+ * hotel's site, so the intake form is pre-filled with location- and style-
+ * specific phrasing instead of generic placeholders. Pulls town/region from
+ * JSON-LD address (with a title/meta "in {place}" fallback) plus style and
+ * audience signals. Returns [] when no location is found (keep placeholders).
+ *
+ * Pages are supplied by the shared crawler, which uses Firecrawl as a fallback
+ * when a site blocks a plain fetch.
  */
 
 interface Profile {
@@ -16,42 +17,7 @@ interface Profile {
   region?: string;
 }
 
-async function fetchPage(url: string): Promise<HTMLElement | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CONFIG.geo.fetchTimeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: { "User-Agent": CONFIG.geo.userAgent, Accept: "text/html,application/xhtml+xml" },
-      cache: "no-store",
-    });
-    clearTimeout(timer);
-    if (res.ok && (res.headers.get("content-type") || "").includes("html")) {
-      return parse(await res.text());
-    }
-  } catch {
-    clearTimeout(timer);
-  }
-  return null;
-}
-
-/** Homepage plus the first contact/about page that resolves (addresses live there). */
-async function fetchProfilePages(domain: string): Promise<HTMLElement[]> {
-  const home = (await fetchPage(`https://${domain}`)) ?? (await fetchPage(`http://${domain}`));
-  if (!home) return [];
-  const roots = [home];
-  for (const path of ["/contact", "/contact-us", "/about", "/location", "/find-us"]) {
-    const p = await fetchPage(`https://${domain}${path}`);
-    if (p) {
-      roots.push(p);
-      break;
-    }
-  }
-  return roots;
-}
-
-/** Town / region from JSON-LD PostalAddress across the fetched pages. */
+/** Town / region from JSON-LD PostalAddress across the crawled pages. */
 function extractSchemaProfile(roots: HTMLElement[]): Profile {
   const profile: Profile = {};
   const walk = (node: unknown) => {
@@ -80,30 +46,9 @@ function extractSchemaProfile(roots: HTMLElement[]): Profile {
 
 // Words that follow "in ..." but are not places.
 const NON_PLACE = new Set([
-  "the",
-  "style",
-  "comfort",
-  "luxury",
-  "heart",
-  "centre",
-  "center",
-  "countryside",
-  "middle",
-  "season",
-  "world",
-  "town",
-  "city",
-  "our",
-  "your",
-  "a",
-  "an",
-  "one",
-  "time",
-  "touch",
-  "need",
-  "which",
-  "advance",
-  "person",
+  "the", "style", "comfort", "luxury", "heart", "centre", "center", "countryside",
+  "middle", "season", "world", "town", "city", "our", "your", "a", "an", "one",
+  "time", "touch", "need", "which", "advance", "person",
 ]);
 
 /** Fallback: pull a place name from a "... in {Place}" phrase in title/meta/H1. */
@@ -135,16 +80,16 @@ function corpus(roots: HTMLElement[]): string {
   return bits.filter(Boolean).join(" ").toLowerCase();
 }
 
-export async function suggestQuestions(domain: string): Promise<string[]> {
-  const roots = await fetchProfilePages(domain);
-  if (roots.length === 0) return [];
+export function suggestFromPages(pages: Page[]): string[] {
+  if (pages.length === 0) return [];
+  const roots = pages.map((p) => p.root);
 
   const schema = extractSchemaProfile(roots);
   const phrase = schema.town || schema.region ? {} : extractPhraseProfile(roots[0]);
   const town = schema.town;
   const region = schema.region || phrase.region;
   const place = town || region;
-  if (!place) return []; // cannot tailor without a location; keep generic placeholders
+  if (!place) return []; // cannot tailor without a location
   const wider = region || town!;
 
   const text = corpus(roots);
