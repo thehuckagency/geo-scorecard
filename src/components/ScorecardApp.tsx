@@ -73,7 +73,7 @@ export default function ScorecardApp() {
   const pollRef = useRef<number | null>(null);
 
   const emailValid = EMAIL_RE.test(email.trim());
-  const maxQuestions = emailValid ? CONFIG.questions.full : CONFIG.questions.free;
+  const maxQuestions = CONFIG.questions.full;
 
   // --- Step 1: domain -> instant GEO ---
   const runGeo = useCallback(
@@ -274,13 +274,13 @@ export default function ScorecardApp() {
               </div>
               {questions.length < maxQuestions ? (
                 <button type="button" onClick={addQuestion} className="focus-ring mt-2.5 text-[13.5px] font-semibold text-gain hover:text-ink">
-                  + Add another question
+                  + Add another question ({questions.length}/{maxQuestions})
                 </button>
-              ) : !emailValid ? (
+              ) : (
                 <p className="mt-2.5 text-[13px] text-muted">
-                  Add your email below to test up to {CONFIG.questions.full} questions.
+                  That is the maximum of {maxQuestions} questions.
                 </p>
-              ) : null}
+              )}
 
               <div className="mt-5 border-t border-sage/50 pt-5">
                 <p className="text-[14.5px] leading-relaxed text-muted">
