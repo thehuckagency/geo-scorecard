@@ -5,7 +5,7 @@
  * process.env inside server-only modules and never surfaced here.
  */
 
-export type EngineId = "perplexity" | "dataforseo";
+export type EngineId = "perplexity" | "dataforseo" | "chatgpt";
 
 export interface ScoreBand {
   min: number;
@@ -30,10 +30,13 @@ export const CONFIG = {
   },
 
   // ----- Which engines to run (order shown in UI) -----
-  engines: ["perplexity", "dataforseo"] as EngineId[],
+  // "chatgpt" also uses DataForSEO LLM Mentions (platform chat_gpt, US/English
+  // only). Remove it from this array to switch the ChatGPT layer off.
+  engines: ["perplexity", "dataforseo", "chatgpt"] as EngineId[],
   engineLabels: {
     perplexity: "Perplexity",
     dataforseo: "Google AIO",
+    chatgpt: "ChatGPT",
   } as Record<EngineId, string>,
 
   // ----- Concurrency + cost guards -----

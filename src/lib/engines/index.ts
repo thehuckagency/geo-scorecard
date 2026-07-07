@@ -27,7 +27,10 @@ async function runEngine(
 ): Promise<EngineResult> {
   if (isMockMode()) return queryMock(question, domain, engine);
   if (engine === "perplexity") return queryPerplexity(question, domain);
-  return queryDataForSeo(question, domain);
+  // Both DataForSEO layers share the same API + credentials, differing only by
+  // platform: google (UK AI Overview) vs chat_gpt (US ChatGPT mentions).
+  if (engine === "chatgpt") return queryDataForSeo(question, domain, "chatgpt", "chat_gpt");
+  return queryDataForSeo(question, domain, "dataforseo", "google");
 }
 
 /** Run every configured engine for one question. */

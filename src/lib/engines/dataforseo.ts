@@ -1,26 +1,40 @@
 import "server-only";
-import { CONFIG } from "../config";
+import { CONFIG, type EngineId } from "../config";
 import type { EngineResult } from "../types";
 import { domainFromUrl } from "../normalize";
 import { errorResult, fetchWithTimeout, resultFromDomains } from "./shared";
 
 /**
- * Query DataForSEO LLM Mentions (Google AI Overview layer) for one question.
- * The live task can take up to 120s, so this must only run inside the async
- * worker, never in a page request.
+ * Query DataForSEO LLM Mentions for one question. Serves two layers from the
+ * same API + credentials:
+ *   - platform "google"  -> Google AI Overview (UK-targeted), engine "dataforseo"
+ *   - platform "chat_gpt" -> ChatGPT mentions (US/English only), engine "chatgpt"
  * Docs: https://docs.dataforseo.com (ai_optimization/llm_mentions/search/live)
  */
 export async function queryDataForSeo(
   question: string,
   userDomain: string,
+  engine: EngineId = "dataforseo",
+  platform: string = CONFIG.dataforseo.platform,
 ): Promise<EngineResult> {
   const login = process.env.DATAFORSEO_LOGIN;
   const password = process.env.DATAFORSEO_PASSWORD;
   if (!login || !password) {
-    return errorResult("dataforseo", "DataForSEO credentials not configured.");
+    return errorResult(engine, "DataForSEO credentials not configured.");
   }
 
   const auth = Buffer.from(`${login}:${password}`).toString("base64");
+
+  // The chat_gpt platform is US/English only; only send a UK location for google.
+  const taskPayload: Record<string, unknown> = {
+    platform,
+    language_code: CONFIG.dataforseo.languageCode,
+    target: [
+      { keyword: question, search_scope: ["answer"] },
+      { domain: userDomain, search_scope: ["sources"] },
+    ],
+  };
+  if (platform === "google") taskPayload.location_name = CONFIG.dataforseo.locationName;
 
   try {
     const res = await fetchWithTimeout(
@@ -31,23 +45,13 @@ export async function queryDataForSeo(
           Authorization: `Basic ${auth}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify([
-          {
-            platform: CONFIG.dataforseo.platform,
-            location_name: CONFIG.dataforseo.locationName,
-            language_code: CONFIG.dataforseo.languageCode,
-            target: [
-              { keyword: question, search_scope: ["answer"] },
-              { domain: userDomain, search_scope: ["sources"] },
-            ],
-          },
-        ]),
+        body: JSON.stringify([taskPayload]),
       },
-      130_000, // task can take up to 120s
+      130_000,
     );
 
     if (!res.ok) {
-      return errorResult("dataforseo", `DataForSEO responded ${res.status}`);
+      return errorResult(engine, `DataForSEO responded ${res.status}`);
     }
     const data = (await res.json()) as {
       tasks?: {
@@ -77,12 +81,12 @@ export async function queryDataForSeo(
       }
     }
 
-    return resultFromDomains("dataforseo", ordered, userDomain, {
+    return resultFromDomains(engine, ordered, userDomain, {
       aiSearchVolume,
       costUsd: task?.cost ?? undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "DataForSEO request failed";
-    return errorResult("dataforseo", message);
+    return errorResult(engine, message);
   }
 }
