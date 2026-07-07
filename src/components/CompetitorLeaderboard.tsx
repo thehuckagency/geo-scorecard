@@ -6,6 +6,14 @@ const KIND_TONE: Record<CompetitorKind, string> = {
   ota: "border-warn/40 bg-warn/10 text-warn",
   rival: "border-ink/25 bg-ink/5 text-ink",
   info: "border-sage/60 text-muted",
+  other: "border-sage/50 text-muted/80",
+};
+
+const BAR_TONE: Record<CompetitorKind, string> = {
+  ota: "bg-warn",
+  rival: "bg-ink",
+  info: "bg-sage",
+  other: "bg-sage/60",
 };
 
 /** Top domains AI recommends for these questions, ranked and typed. */
@@ -39,9 +47,7 @@ export function CompetitorLeaderboard({
           </span>
           <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-sunk">
             <span
-              className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-out-quint ${
-                c.kind === "ota" ? "bg-warn" : c.kind === "rival" ? "bg-ink" : "bg-sage"
-              }`}
+              className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-out-quint ${BAR_TONE[c.kind]}`}
               style={{ width: `${(c.count / max) * 100}%` }}
             />
           </span>

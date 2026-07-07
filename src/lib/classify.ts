@@ -4,87 +4,90 @@ import { normalizeDomain } from "./normalize";
 /**
  * Classify a cited domain so hoteliers can tell WHO is beating them:
  *   - "ota"   : booking engines / aggregators / metasearch (a direct-booking problem)
- *   - "info"  : encyclopedias, forums, video, press, tourism boards (context, not a rival)
- *   - "rival" : anything else, most likely another property or its site
+ *   - "info"  : encyclopedias, forums, video, press, tourism boards, orgs, gov
+ *   - "rival" : another property (its own site)
+ *   - "other" : anything we cannot confidently place
+ *
+ * Matching is on the registrable domain (the label before the public suffix),
+ * so country variants (tripadvisor.ca / .com / .co.uk) resolve the same way, and
+ * "hotel"-style names count as rivals rather than being mistaken for OTAs.
  */
 
-const OTA_DOMAINS = new Set([
-  "booking.com",
-  "expedia.co.uk",
-  "expedia.com",
-  "hotels.com",
-  "trivago.co.uk",
-  "trivago.com",
-  "agoda.com",
-  "lastminute.com",
-  "laterooms.com",
-  "kayak.co.uk",
-  "kayak.com",
-  "skyscanner.net",
-  "travelrepublic.co.uk",
-  "onthebeach.co.uk",
-  "loveholidays.com",
-  "secretescapes.com",
-  "mrandmrssmith.com",
-  "hoseasons.co.uk",
-  "sykescottages.co.uk",
-  "cottages.com",
-  "airbnb.co.uk",
-  "airbnb.com",
-  "vrbo.com",
-  "priceline.com",
-  "hostelworld.com",
-  "spabreaks.com",
-  "redletterdays.co.uk",
-  "greatlittlebreaks.com",
-  "petspyjamas.com",
-  "caninecottages.co.uk",
-  "coolstays.com",
-  "i-escape.com",
-  "hotelscombined.com",
-  "reservations.com",
+// Two-label public suffixes we need to see past to find the real name.
+const COMPOUND_SUFFIXES = new Set([
+  "co.uk", "org.uk", "gov.uk", "ac.uk", "me.uk", "net.uk", "sch.uk", "nhs.uk", "ltd.uk", "plc.uk",
+  "com.au", "net.au", "org.au", "co.nz", "org.nz", "co.za", "com.sg", "gov.scot", "gov.wales",
 ]);
 
-const OTA_KEYWORDS = ["booking", "hotels", "rooms", "breaks", "cottages", "holiday", "escapes"];
-
-const INFO_DOMAINS = new Set([
-  "en.wikipedia.org",
-  "wikipedia.org",
-  "reddit.com",
-  "youtube.com",
-  "quora.com",
-  "tripadvisor.co.uk",
-  "tripadvisor.com",
-  "timeout.com",
-  "theguardian.com",
-  "forbes.com",
-  "cntraveller.com",
-  "conde-nast-johansens.com",
-  "nationaltrust.org.uk",
-  "visitbritain.com",
-  "visitengland.com",
-  "google.com",
-  "facebook.com",
-  "instagram.com",
-  "tiktok.com",
+// Suffixes that signal an organisation / government / academic site (=> info).
+const INFO_SUFFIXES = new Set([
+  "org", "org.uk", "gov", "gov.uk", "ac.uk", "edu", "nhs.uk", "gov.scot", "gov.wales", "int",
 ]);
 
-const INFO_SUFFIXES = [".gov.uk", ".gov", ".ac.uk", ".edu"];
-const INFO_KEYWORDS = ["visit", "wiki", "guide", "blog", "magazine", "traveltips", "tourism"];
+// Known intermediaries (matched by registrable name, any TLD).
+const OTA_NAMES = new Set([
+  "booking", "expedia", "hotels", "trivago", "agoda", "lastminute", "laterooms", "kayak",
+  "skyscanner", "travelrepublic", "onthebeach", "loveholidays", "secretescapes", "mrandmrssmith",
+  "hoseasons", "sykescottages", "cottages", "airbnb", "vrbo", "priceline", "hostelworld",
+  "hotelscombined", "reservations", "snaptrip", "canopyandstars", "sawdays", "i-escape",
+  "coolstays", "redletterdays", "greatlittlebreaks", "petspyjamas", "caninecottages", "momondo",
+  "hotwire", "orbitz", "travelsupermarket", "hotelplanner", "wotif", "ebookers", "getaroom",
+  "spabreaks", "buyagift", "virginexperiencedays", "groupon",
+]);
+
+// Known info / guide / press / social / search / tourism domains (by name).
+const INFO_NAMES = new Set([
+  "wikipedia", "wikivoyage", "reddit", "youtube", "quora", "tripadvisor", "yelp", "timeout",
+  "theguardian", "guardian", "telegraph", "independent", "forbes", "cntraveller", "cntraveler",
+  "condenast", "lonelyplanet", "roughguides", "tripsavvy", "culturetrip", "facebook", "instagram",
+  "tiktok", "twitter", "pinterest", "google", "bing", "visitbritain", "visitengland",
+  "visitscotland", "visitwales", "nationaltrust", "englishheritage", "bbc", "thetimes",
+]);
+
+// Substrings that mark an info/guide/org site.
+const INFO_TOKENS = [
+  "visit", "wiki", "guide", "magazine", "tourism", "council", "museum", "trust", "gallery",
+  "society", "association", "heritage", "gazette", "news", "review",
+];
+
+// Substrings that mark an actual property (=> rival).
+const HOTEL_TOKENS = [
+  "hotel", "inn", "lodge", "resort", "manor", "guesthouse", "bandb", "bnb", "arms", "priory",
+  "grange", "hallhotel",
+];
+
+interface Parts {
+  domain: string;
+  name: string; // registrable label
+  suffix: string; // public suffix (1 or 2 labels)
+}
+
+function parseDomain(input: string): Parts {
+  const domain = normalizeDomain(input);
+  const labels = domain.split(".").filter(Boolean);
+  if (labels.length < 2) return { domain, name: domain, suffix: "" };
+  const last2 = labels.slice(-2).join(".");
+  const suffixLen = COMPOUND_SUFFIXES.has(last2) ? 2 : 1;
+  const suffix = labels.slice(labels.length - suffixLen).join(".");
+  const name = labels[labels.length - suffixLen - 1] ?? labels[0];
+  return { domain, name, suffix };
+}
 
 export function classifyDomain(input: string): CompetitorKind {
-  const d = normalizeDomain(input);
-  if (!d) return "rival";
-  if (OTA_DOMAINS.has(d)) return "ota";
-  if (INFO_DOMAINS.has(d)) return "info";
-  if (INFO_SUFFIXES.some((s) => d.endsWith(s))) return "info";
-  if (INFO_KEYWORDS.some((k) => d.includes(k))) return "info";
-  if (OTA_KEYWORDS.some((k) => d.includes(k))) return "ota";
-  return "rival";
+  const { name, suffix } = parseDomain(input);
+  if (!name) return "other";
+
+  if (OTA_NAMES.has(name)) return "ota";
+  if (INFO_NAMES.has(name)) return "info";
+  if (INFO_SUFFIXES.has(suffix)) return "info";
+  if (INFO_TOKENS.some((t) => name.includes(t))) return "info";
+  if (HOTEL_TOKENS.some((t) => name.includes(t))) return "rival";
+  return "other";
 }
 
 export const KIND_LABEL: Record<CompetitorKind, string> = {
   ota: "OTA / aggregator",
   info: "Guide / info site",
   rival: "Rival property",
+  other: "Other site",
 };

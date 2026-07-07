@@ -40,7 +40,7 @@ export interface QuestionResult {
   bestPosition: number | null;
 }
 
-export type CompetitorKind = "ota" | "info" | "rival";
+export type CompetitorKind = "ota" | "info" | "rival" | "other";
 
 export interface GeoSignal {
   id: string;
