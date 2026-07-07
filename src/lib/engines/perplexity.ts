@@ -7,6 +7,7 @@ import { errorResult, fetchWithTimeout, resultFromDomains } from "./shared";
 interface SonarResponse {
   citations?: string[];
   search_results?: { title?: string; url?: string }[];
+  choices?: { message?: { content?: string } }[];
   usage?: { cost?: { total_cost?: number } };
 }
 
@@ -55,9 +56,14 @@ export async function queryPerplexity(
       ordered.push(domainFromUrl(c));
     }
 
-    return resultFromDomains("perplexity", ordered, userDomain, {
+    const answer = data.choices?.[0]?.message?.content?.trim();
+    const result = resultFromDomains("perplexity", ordered, userDomain, {
       costUsd: data.usage?.cost?.total_cost ?? undefined,
+      responsesSampled: 1,
+      sampleAnswer: answer ? answer.slice(0, 320) : undefined,
     });
+    result.citedShare = result.cited ? 1 : 0;
+    return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Perplexity request failed";
     return errorResult("perplexity", message);

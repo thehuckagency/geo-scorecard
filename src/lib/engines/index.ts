@@ -1,7 +1,7 @@
 import "server-only";
 import type { EngineId } from "../config";
 import { CONFIG } from "../config";
-import type { EngineResult } from "../types";
+import type { BrandCheck, EngineResult } from "../types";
 import { queryPerplexity } from "./perplexity";
 import { queryDataForSeo } from "./dataforseo";
 import { queryMock } from "./mock";
@@ -39,4 +39,26 @@ export async function runQuestion(
   domain: string,
 ): Promise<EngineResult[]> {
   return Promise.all(CONFIG.engines.map((e) => runEngine(e, question, domain)));
+}
+
+/**
+ * Ask AI directly about the business by name, to gauge whether AI knows the
+ * brand at all and what it says. Uses Perplexity when available (genuine UK
+ * query), else the DataForSEO Google layer, else mock.
+ */
+export async function runBrandCheck(businessName: string, domain: string): Promise<BrandCheck> {
+  const question = `Tell me about ${businessName}, a hotel. What is it known for and where is it?`;
+  const toCheck = (engine: EngineId, r: EngineResult): BrandCheck => ({
+    businessName,
+    engine,
+    answer: r.sampleAnswer ?? null,
+    ownDomainCited: r.cited,
+    error: r.error,
+  });
+
+  if (isMockMode()) return toCheck("perplexity", await queryMock(question, domain, "perplexity"));
+  if (perplexityEnabled()) return toCheck("perplexity", await queryPerplexity(question, domain));
+  if (dataForSeoEnabled())
+    return toCheck("dataforseo", await queryDataForSeo(question, domain, "dataforseo", "google"));
+  return { businessName, engine: "perplexity", answer: null, ownDomainCited: false, error: "No engine configured." };
 }

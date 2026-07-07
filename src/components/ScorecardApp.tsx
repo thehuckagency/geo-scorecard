@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CONFIG, PUBLIC } from "@/lib/config";
 import type {
+  BrandCheck,
   GeoReadiness,
   JobStatus,
   QuestionResult,
@@ -12,6 +13,9 @@ import { ScoreDial } from "./ScoreDial";
 import { GeoChecklist } from "./GeoChecklist";
 import { QuestionRows } from "./QuestionRows";
 import { CompetitorLeaderboard } from "./CompetitorLeaderboard";
+import { Recommendations } from "./Recommendations";
+import { VisibilityBar } from "./VisibilityBar";
+import { BrandCheckCard } from "./BrandCheckCard";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,6 +28,7 @@ interface StatusResponse {
   progress: { done: number; total: number };
   geo: GeoReadiness | null;
   questions: QuestionResult[];
+  brandCheck: BrandCheck | null;
   scorecard: ScorecardType | null;
   error?: string;
 }
@@ -352,6 +357,32 @@ function Results({
           </>
         )}
       </div>
+
+      {/* Priority fixes + visibility split */}
+      {done && sc && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="card p-6 sm:p-7">
+            <h3 className="mb-1 font-display text-[19px] font-semibold text-ink">Your priority fixes</h3>
+            <p className="mb-4 text-[13.5px] text-muted">Where to start, ranked by impact.</p>
+            {sc.recommendations.length ? (
+              <Recommendations items={sc.recommendations} />
+            ) : (
+              <p className="text-[14px] text-muted">You are in good shape. Keep your content fresh.</p>
+            )}
+          </div>
+          <div className="space-y-6">
+            <div className="card p-6 sm:p-7">
+              <h3 className="mb-4 text-[15px] font-semibold text-ink">Where your visibility comes from</h3>
+              <VisibilityBar v={sc.visibility} />
+            </div>
+            {status?.brandCheck && (
+              <div className="card p-6 sm:p-7">
+                <BrandCheckCard brand={status.brandCheck} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Per-question results */}

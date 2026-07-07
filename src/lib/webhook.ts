@@ -40,7 +40,16 @@ export function buildLeadPayload(job: Job) {
       })),
     })),
     // Competitors AI recommends instead
-    topCompetitors: (sc?.competitors ?? []).map((c) => `${c.domain} (${c.count})`),
+    topCompetitors: (sc?.competitors ?? []).map((c) => `${c.domain} (${c.count}, ${c.kind})`),
+    // Where visibility comes from
+    visibilityOwnSite: sc?.visibility.ownDomain ?? null,
+    visibilityViaOta: sc?.visibility.viaOta ?? null,
+    visibilityInvisible: sc?.visibility.invisible ?? null,
+    // Prioritised fixes
+    recommendations: (sc?.recommendations ?? []).map((r) => r.title),
+    // Brand visibility probe
+    brandKnown: job.brandCheck ? job.brandCheck.ownDomainCited : null,
+    brandAnswer: job.brandCheck?.answer ?? null,
     // Meta
     apiCostUsd: Math.round((job.costUsd ?? 0) * 10000) / 10000,
     source: "ai-search-visibility-scorecard",

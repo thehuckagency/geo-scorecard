@@ -12,6 +12,24 @@ interface DfsSource {
 interface DfsItem {
   sources?: DfsSource[];
   ai_search_volume?: number;
+  answer?: string;
+  fan_out_queries?: unknown;
+}
+
+/** DataForSEO's fan_out_queries can be strings or objects; coerce to strings. */
+function toQueries(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const q of raw) {
+    if (typeof q === "string") out.push(q);
+    else if (q && typeof q === "object") {
+      const o = q as Record<string, unknown>;
+      const v = o.query ?? o.keyword ?? o.title;
+      if (typeof v === "string") out.push(v);
+    }
+    if (out.length >= 5) break;
+  }
+  return out;
 }
 
 /**
@@ -74,11 +92,20 @@ export async function queryDataForSeo(
     let userCited = false;
     let bestPosition: number | null = null;
     let aiSearchVolume: number | null = null;
+    let sampleAnswer: string | undefined;
+    let relatedQuestions: string[] = [];
+    let responsesWithUser = 0;
 
     for (const item of items) {
       if (item.ai_search_volume != null && aiSearchVolume == null) {
         aiSearchVolume = item.ai_search_volume;
       }
+      if (!sampleAnswer && item.answer && item.answer.trim().length > 40) {
+        sampleAnswer = item.answer.trim().slice(0, 320);
+      }
+      if (relatedQuestions.length === 0) relatedQuestions = toQueries(item.fan_out_queries);
+
+      let userInThisResponse = false;
       (item.sources ?? []).forEach((s, idx) => {
         const d = s.domain
           ? s.domain.replace(/^www\./, "").toLowerCase()
@@ -86,12 +113,14 @@ export async function queryDataForSeo(
         if (!d) return;
         if (domainsMatch(d, userDomain)) {
           userCited = true;
+          userInThisResponse = true;
           const pos = typeof s.position === "number" ? s.position : idx + 1;
           if (bestPosition == null || pos < bestPosition) bestPosition = pos;
         } else {
           competitorFreq.set(d, (competitorFreq.get(d) ?? 0) + 1);
         }
       });
+      if (userInThisResponse) responsesWithUser++;
     }
 
     // Competitors ordered by how often AI cited them (most first).
@@ -107,6 +136,10 @@ export async function queryDataForSeo(
       sourceCount: competitorFreq.size + (userCited ? 1 : 0),
       competitors,
       aiSearchVolume,
+      citedShare: items.length ? responsesWithUser / items.length : 0,
+      responsesSampled: items.length,
+      sampleAnswer,
+      relatedQuestions,
       costUsd: task?.cost ?? undefined,
     };
   } catch (err) {

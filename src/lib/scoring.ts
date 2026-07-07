@@ -1,9 +1,12 @@
 import { CONFIG, bandFor } from "./config";
+import { classifyDomain } from "./classify";
+import { generateRecommendations } from "./recommendations";
 import type {
   CompetitorEntry,
   GeoReadiness,
   QuestionResult,
   Scorecard,
+  VisibilitySplit,
 } from "./types";
 
 /** Lowest 1-based position the domain reached across engines, or null. */
@@ -82,9 +85,26 @@ export function computeScorecard(
     }
   }
   const competitors: CompetitorEntry[] = [...counts.entries()]
-    .map(([domain, count]) => ({ domain, count }))
+    .map(([domain, count]) => ({ domain, count, kind: classifyDomain(domain) }))
     .sort((a, b) => b.count - a.count || a.domain.localeCompare(b.domain))
-    .slice(0, 8);
+    .slice(0, 10);
+
+  // Where the user's visibility comes from: own site, via OTAs, or nowhere.
+  let ownDomain = 0;
+  let viaOta = 0;
+  let invisible = 0;
+  for (const q of answered) {
+    if (citedAny(q)) {
+      ownDomain++;
+    } else if (questionCompetitors(q).some((d) => classifyDomain(d) === "ota")) {
+      viaOta++;
+    } else {
+      invisible++;
+    }
+  }
+  const visibility: VisibilitySplit = { ownDomain, viaOta, invisible };
+
+  const recommendations = generateRecommendations({ geo, questions, competitors, visibility });
 
   const band = bandFor(total);
 
@@ -100,5 +120,7 @@ export function computeScorecard(
     },
     band: { label: band.label, min: band.min, max: band.max },
     competitors,
+    visibility,
+    recommendations,
   };
 }

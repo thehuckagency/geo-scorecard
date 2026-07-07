@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { CONFIG } from "@/lib/config";
 import { getJob, saveJob } from "@/lib/store";
 import { analyzeGeo } from "@/lib/geo/analyze";
-import { runQuestion } from "@/lib/engines";
+import { runBrandCheck, runQuestion } from "@/lib/engines";
 import { bestPosition, citedAny, computeScorecard } from "@/lib/scoring";
 import { postLead } from "@/lib/webhook";
 import type { Job } from "@/lib/types";
@@ -76,6 +76,12 @@ export async function POST(req: Request) {
       }
       await touch();
     });
+
+    // Brand-visibility probe (only if a business name was given).
+    if (job.lead.businessName) {
+      job.brandCheck = await runBrandCheck(job.lead.businessName, job.domain);
+      await touch();
+    }
 
     job.scorecard = computeScorecard(job.questions, job.geo);
     job.status = "done";

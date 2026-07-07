@@ -137,12 +137,23 @@ export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
   const hasAddressSchema = types.has("postaladdress") || types.has("place");
   const extractableFacts = hasTel || hasPostcode || hasAddressSchema;
 
+  const hasReviewSchema = types.has("aggregaterating") || types.has("review") || types.has("rating");
+
+  const hasImageSchema = types.has("imageobject");
+  const hasOgImage = anyPage(
+    (p) => !!p.root.querySelector('meta[property="og:image"]')?.getAttribute("content"),
+  );
+  const hasAltImages = anyPage(
+    (p) => p.root.querySelectorAll("img[alt]").filter((el) => (el.getAttribute("alt") || "").trim().length > 3).length >= 3,
+  );
+  const hasImages = hasImageSchema || hasOgImage || hasAltImages;
+
   const signals: GeoSignal[] = [
     {
       id: "business-schema",
       label: "Hotel / LocalBusiness schema",
       present: hasBusinessSchema,
-      points: 5,
+      points: 4,
       detail: hasBusinessSchema
         ? "Structured business data helps AI identify and quote you."
         : "Add Hotel or LocalBusiness JSON-LD so AI can identify you.",
@@ -151,7 +162,7 @@ export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
       id: "faq-schema",
       label: "FAQ schema markup",
       present: hasFaqSchema,
-      points: 3,
+      points: 2,
       detail: hasFaqSchema
         ? "FAQPage markup gives AI ready-made question and answer pairs."
         : "Add FAQPage schema to your common guest questions.",
@@ -169,7 +180,7 @@ export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
       id: "headings",
       label: "Clean heading hierarchy",
       present: cleanHeadings,
-      points: 3,
+      points: 2,
       detail: cleanHeadings
         ? "One clear H1 with structured H2s is easy to parse."
         : "Use a single H1 and clear H2 sections.",
@@ -187,10 +198,28 @@ export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
       id: "extractable-facts",
       label: "Extractable facts (address, contact)",
       present: extractableFacts,
-      points: 3,
+      points: 2,
       detail: extractableFacts
         ? "Address and contact details are easy for AI to lift."
         : "Publish your address, postcode and phone number as text.",
+    },
+    {
+      id: "reviews",
+      label: "Review and rating markup",
+      present: hasReviewSchema,
+      points: 2,
+      detail: hasReviewSchema
+        ? "Machine-readable ratings are a strong signal AI trusts."
+        : "Add aggregateRating and Review schema so AI can see your rating.",
+    },
+    {
+      id: "images",
+      label: "Described images",
+      present: hasImages,
+      points: 2,
+      detail: hasImages
+        ? "Captioned, described imagery adds extractable detail."
+        : "Add descriptive alt text and an og:image to your key pages.",
     },
   ];
 

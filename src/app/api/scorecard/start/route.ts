@@ -75,6 +75,7 @@ export async function POST(req: Request) {
       name: (body.name || "").trim(),
       consent: true,
     },
+    brandCheck: null,
     scorecard: null,
     costUsd: 0,
   };

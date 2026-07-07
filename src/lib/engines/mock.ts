@@ -62,8 +62,17 @@ export async function queryMock(
     ordered.splice(pos, 0, userDomain);
   }
 
-  return resultFromDomains(engine, ordered, userDomain, {
+  const sampled = engine === "perplexity" ? 1 : 20 + Math.floor(rng() * 20);
+  const result = resultFromDomains(engine, ordered, userDomain, {
     aiSearchVolume: engine === "dataforseo" ? Math.round((100 + rng() * 3900) / 10) * 10 : null,
+    responsesSampled: sampled,
+    sampleAnswer: `For ${question}, popular choices include ${pool.slice(0, 3).join(", ")}. Travellers highlight location, value and guest reviews when comparing options.`,
+    relatedQuestions:
+      engine === "perplexity"
+        ? []
+        : [`${question} with parking`, `${question} on a budget`, `family friendly ${question}`],
     costUsd: engine === "perplexity" ? 0.005 : 0.02,
   });
+  result.citedShare = cited ? 0.3 + rng() * 0.5 : 0;
+  return result;
 }

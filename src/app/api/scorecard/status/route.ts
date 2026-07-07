@@ -28,6 +28,7 @@ export async function GET(req: Request) {
     progress: { done, total },
     geo: job.geo,
     questions: job.questions,
+    brandCheck: job.brandCheck,
     scorecard: job.scorecard,
     costUsd: job.costUsd,
     error: job.error,

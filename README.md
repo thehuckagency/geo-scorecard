@@ -47,9 +47,10 @@ AI checks never run inside the request that serves the page. The flow:
                                                per question, then the final 0-100 score
 ```
 
-- The **worker** is where `export const maxDuration = 300` is set (Vercel Pro ceiling).
-  `start`, `status` and `geo` use short limits. See the `route.ts` files under
-  `src/app/api/scorecard/`.
+- The **worker** sets `export const maxDuration = 60` (works on every Vercel plan).
+  In practice DataForSEO LLM Mentions returns in ~2s and Perplexity in a few seconds, so
+  60s is ample; Pro is not required. `start`, `status` and `geo` use short limits too. See
+  the `route.ts` files under `src/app/api/scorecard/`.
 - `start` hands off to the worker with `after()` (from `next/server`) so the worker runs
   on its own invocation with its own time budget, authenticated by `INTERNAL_SECRET`.
 - Concurrency is capped by `CONFIG.concurrency` (default 3) and question count by
@@ -113,11 +114,31 @@ Update any figure there without touching logic. Scoring lives in
   list, averaged over cited questions.
 - **Competitor gap (15):** reduced by the share of questions where competitors were cited
   but the user was not.
-- **On-page GEO readiness (20):** sum of structural signals present (business schema 5, FAQ
-  schema 3, FAQ content 3, clean headings 3, entity clarity 3, extractable facts 3).
+- **On-page GEO readiness (20):** sum of structural signals present (business schema 4, FAQ
+  schema 2, FAQ content 3, clean headings 2, entity clarity 3, extractable facts 2, review
+  markup 2, described images 2).
 
 Rounded to a whole number, mapped to a band label (80+ "Highly visible in AI search" down
 to 0-19 "Not showing up").
+
+### Findings shown beyond the score
+
+- **What AI actually said** per question (a real answer excerpt), plus AI search volume and
+  the related "people also ask AI" fan-out queries.
+- **Citation frequency** for the DataForSEO layers: not just cited yes/no, but the share of
+  sampled AI responses that cite you (a confidence signal).
+- **Competitor leaderboard, typed:** each cited domain tagged OTA/aggregator, guide/info, or
+  rival property, so "beaten by Booking.com" reads differently from "beaten by a rival hotel".
+- **Visibility split:** how many questions you win on your own site vs where only OTAs are
+  cited vs where no one relevant is cited.
+- **Brand check:** what AI says when asked about the business by name, and whether it is
+  recognised at all (needs the optional business-name field).
+- **Prioritised fixes:** a ranked, specific action list generated from the citation and GEO
+  gaps (`src/lib/recommendations.ts`).
+
+The DataForSEO layers query **keyword-only** and aggregate across sampled recorded AI
+responses; sending a domain target too would AND the two and return nothing whenever the user
+is not already cited. Tune the sample with `CONFIG.dataforseo.sampleLimit`.
 
 ---
 
@@ -175,9 +196,15 @@ records the GDPR checkbox.
 3. Set the env vars above (`PERPLEXITY_API_KEY`, `DATAFORSEO_LOGIN`/`PASSWORD`,
    `LEAD_WEBHOOK_URL`, `INTERNAL_SECRET`, `NEXT_PUBLIC_BOOKING_URL`, `NEXT_PUBLIC_PRIVACY_URL`).
    Leave the engine keys blank to ship in mock mode first.
-4. The worker needs **Vercel Pro** for `maxDuration: 300`. On Hobby it is capped lower; keep
-   the question count and concurrency small if you must run there.
+4. Runs on any plan (the worker uses a 60s `maxDuration`); **Vercel Pro is not required**.
 5. Redeploy after any env change (Next inlines `NEXT_PUBLIC_*` at build time).
+
+### Cost per scorecard
+
+Perplexity `sonar` is a fraction of a cent per question. **DataForSEO bills roughly $0.15-0.20
+per call**, and there are two DataForSEO layers (Google AIO + ChatGPT), so a full 10-question
+run is about **$3-4**. Levers: lower `CONFIG.dataforseo.sampleLimit`, reduce the question cap,
+or remove `"chatgpt"` from `CONFIG.engines`. Every run logs its total (`apiCostUsd`).
 
 ## Embedding
 
