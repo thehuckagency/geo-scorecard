@@ -19,6 +19,9 @@ export async function POST(req: Request) {
   const keyword = body.keyword || "best hotels in edinburgh";
   const domain = body.domain || "booking.com";
   const platform = body.platform || "google";
+  const keywordOnly = body.keywordOnly === true;
+  const matchType = body.matchType; // e.g. "partial_match"
+  const scope = body.scope; // e.g. ["any"] or ["answer"]
 
   const login = process.env.DATAFORSEO_LOGIN;
   const password = process.env.DATAFORSEO_PASSWORD;
@@ -27,14 +30,17 @@ export async function POST(req: Request) {
   }
   const auth = Buffer.from(`${login}:${password}`).toString("base64");
 
+  const target: Record<string, unknown>[] = [
+    { keyword, search_scope: scope || ["answer"] },
+  ];
+  if (!keywordOnly) target.push({ domain, search_scope: ["sources"] });
+
   const task: Record<string, unknown> = {
     platform,
     language_code: CONFIG.dataforseo.languageCode,
-    target: [
-      { keyword, search_scope: ["answer"] },
-      { domain, search_scope: ["sources"] },
-    ],
+    target,
   };
+  if (matchType) task.match_type = matchType;
   if (platform === "google") task.location_name = CONFIG.dataforseo.locationName;
 
   const res = await fetch(CONFIG.dataforseo.endpoint, {
