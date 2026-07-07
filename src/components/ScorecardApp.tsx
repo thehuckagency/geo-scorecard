@@ -62,6 +62,7 @@ export default function ScorecardApp() {
 
   // Questions + lead
   const [questions, setQuestions] = useState<string[]>(["", "", ""]);
+  const [suggested, setSuggested] = useState(false);
   const [email, setEmail] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [name, setName] = useState("");
@@ -95,6 +96,14 @@ export default function ScorecardApp() {
         if (!res.ok) throw new Error(data.error || "Could not analyse that site.");
         setDomain(data.domain);
         setGeo(data.geo);
+        // Pre-fill the question inputs with site-tailored suggestions when we
+        // could read a location from the site; otherwise keep generic placeholders.
+        if (Array.isArray(data.suggestedQuestions) && data.suggestedQuestions.length > 0) {
+          const filled = [...data.suggestedQuestions];
+          while (filled.length < 3) filled.push("");
+          setQuestions(filled);
+          setSuggested(true);
+        }
         setPhase("ready");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -245,7 +254,9 @@ export default function ScorecardApp() {
                 What do your guests ask AI?
               </h2>
               <p className="mt-2 text-[14.5px] leading-relaxed text-muted">
-                Add the questions an ideal guest might type into ChatGPT or Google AI.
+                {suggested
+                  ? "We drafted three from your site. Edit them or add your own."
+                  : "Add the questions an ideal guest might type into ChatGPT or Google AI."}
               </p>
 
               <div className="mt-4 space-y-2.5">

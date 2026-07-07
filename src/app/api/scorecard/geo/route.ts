@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { analyzeGeo } from "@/lib/geo/analyze";
+import { suggestQuestions } from "@/lib/geo/suggest";
 import { normalizeDomain } from "@/lib/normalize";
 
 export const runtime = "nodejs";
@@ -20,6 +21,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Please enter a valid website domain." }, { status: 400 });
   }
 
-  const geo = await analyzeGeo(domain);
-  return NextResponse.json({ domain, geo });
+  // GEO score and tailored question suggestions in parallel (both crawl the
+  // homepage; running them together keeps the free step fast).
+  const [geo, suggestedQuestions] = await Promise.all([
+    analyzeGeo(domain),
+    suggestQuestions(domain),
+  ]);
+  return NextResponse.json({ domain, geo, suggestedQuestions });
 }
