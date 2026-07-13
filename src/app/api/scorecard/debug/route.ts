@@ -59,11 +59,19 @@ export async function POST(req: Request) {
   const key = process.env.FIRECRAWL_API_KEY;
   out.firecrawlKeySet = Boolean(key);
   if (key) {
-    for (const opts of [
-      { formats: ["rawHtml"] },
-      { formats: ["rawHtml"], waitFor: 3500 },
-      { formats: ["html"], waitFor: 3500 },
-    ]) {
+    const variants: Record<string, unknown>[] = [
+      { formats: ["rawHtml"], waitFor: 8000 },
+      {
+        formats: ["rawHtml"],
+        actions: [
+          { type: "wait", milliseconds: 2000 },
+          { type: "scroll", direction: "down" },
+          { type: "wait", milliseconds: 4000 },
+        ],
+      },
+    ];
+    for (let i = 0; i < variants.length; i++) {
+      const opts = variants[i];
       try {
         const r = await fetch("https://api.firecrawl.dev/v1/scrape", {
           method: "POST",
@@ -73,13 +81,14 @@ export async function POST(req: Request) {
         });
         const j = await r.json();
         const html = j?.data?.rawHtml || j?.data?.html || "";
-        out[`firecrawl_${opts.formats[0]}${(opts as { waitFor?: number }).waitFor ? "_wait" : ""}`] = {
+        out[`firecrawl_variant_${i}`] = {
+          config: opts.actions ? "scroll+wait" : `waitFor ${opts.waitFor}`,
           httpStatus: r.status,
           success: j?.success,
           ...(html ? analyse(html) : { noHtml: true, keys: Object.keys(j?.data || {}) }),
         };
       } catch (e) {
-        out[`firecrawl_${opts.formats[0]}`] = { error: String(e) };
+        out[`firecrawl_variant_${i}`] = { error: String(e) };
       }
     }
   }
