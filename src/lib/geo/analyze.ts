@@ -1,10 +1,13 @@
 import "server-only";
 import { type HTMLElement } from "node-html-parser";
 import { CONFIG } from "../config";
-import { crawl, type Page } from "../crawl";
+import { crawl, hasStructuredData, type Page } from "../crawl";
 import type { GeoReadiness, GeoSignal } from "../types";
 
-/** Collect every JSON-LD @type on a page (handles @graph + arrays + nesting). */
+/**
+ * Collect every schema type on a page: JSON-LD @type (handles @graph + arrays +
+ * nesting) and microdata itemtype (e.g. schema.org/Hotel).
+ */
 function jsonLdTypes(root: HTMLElement): Set<string> {
   const types = new Set<string>();
   const walk = (node: unknown) => {
@@ -22,6 +25,11 @@ function jsonLdTypes(root: HTMLElement): Set<string> {
     } catch {
       /* ignore malformed blocks */
     }
+  }
+  // Microdata: itemtype="https://schema.org/Hotel" -> "hotel".
+  for (const el of root.querySelectorAll("[itemtype]")) {
+    const seg = (el.getAttribute("itemtype") || "").split("/").pop()?.trim().toLowerCase();
+    if (seg) types.add(seg);
   }
   return types;
 }
@@ -61,7 +69,12 @@ function questionLikeCount(root: HTMLElement): number {
  * crawled pages are reused for both the GEO score and the question suggestions.
  */
 export async function crawlSite(domain: string): Promise<{ home: Page; pages: Page[] } | null> {
-  const home = (await crawl(`https://${domain}`)) ?? (await crawl(`http://${domain}`));
+  // If the homepage has no structured data in its raw HTML, render it via
+  // Firecrawl before concluding there is none (many sites inject schema by JS).
+  const renderIfNoSchema = { retryRenderIf: (r: HTMLElement) => !hasStructuredData(r) };
+  const home =
+    (await crawl(`https://${domain}`, renderIfNoSchema)) ??
+    (await crawl(`http://${domain}`, renderIfNoSchema));
   if (!home) return null;
 
   const extras: Page[] = [];

@@ -14,6 +14,23 @@ function hasContent(root: HTMLElement): boolean {
   return title.length > 0 || text.length > 300;
 }
 
+/** True when the page exposes any structured data (JSON-LD or microdata). */
+export function hasStructuredData(root: HTMLElement): boolean {
+  return (
+    root.querySelectorAll('script[type="application/ld+json"]').length > 0 ||
+    root.querySelectorAll("[itemtype]").length > 0
+  );
+}
+
+interface CrawlOptions {
+  /**
+   * Re-fetch via Firecrawl (which renders JavaScript) when the direct HTML
+   * matches this test. Used to catch structured data that is injected client-
+   * side and so is absent from the raw HTML.
+   */
+  retryRenderIf?: (root: HTMLElement) => boolean;
+}
+
 /** Plain server-to-server fetch. Fast and free, but blocked by some bot walls. */
 async function directFetch(url: string): Promise<Page | null> {
   const controller = new AbortController();
@@ -70,9 +87,12 @@ async function firecrawlFetch(url: string, apiKey: string): Promise<Page | null>
  * empty, or a JS/challenge shell, falls back to Firecrawl when FIRECRAWL_API_KEY
  * is set. Without the key it is direct-only (previous behaviour).
  */
-export async function crawl(url: string): Promise<Page | null> {
+export async function crawl(url: string, opts: CrawlOptions = {}): Promise<Page | null> {
   const direct = await directFetch(url);
-  if (direct && hasContent(direct.root)) return direct;
+  // Render via Firecrawl if the page is blocked/thin, or if the caller asks us
+  // to (e.g. structured data missing from the raw HTML but injected by JS).
+  const needsRender = direct ? Boolean(opts.retryRenderIf?.(direct.root)) : false;
+  if (direct && hasContent(direct.root) && !needsRender) return direct;
 
   const key = process.env.FIRECRAWL_API_KEY;
   if (key) {
