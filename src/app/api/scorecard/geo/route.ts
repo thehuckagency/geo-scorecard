@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const geo = computeGeo(site.home, site.pages);
+  const geo = computeGeo(site.home, site.pages, site.tagManagerTypes);
   const suggestedQuestions = suggestFromPages(site.pages);
   return NextResponse.json({ domain, geo, suggestedQuestions });
 }

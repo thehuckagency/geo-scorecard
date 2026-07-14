@@ -2,6 +2,7 @@ import "server-only";
 import { type HTMLElement } from "node-html-parser";
 import { CONFIG } from "../config";
 import { crawl, hasStructuredData, type Page } from "../crawl";
+import { tagManagerSchemaTypes } from "./tagmanager";
 import type { GeoReadiness, GeoSignal } from "../types";
 
 /**
@@ -68,7 +69,14 @@ function questionLikeCount(root: HTMLElement): number {
  * faq/rooms for GEO signals) via the shared crawler (Firecrawl fallback). The
  * crawled pages are reused for both the GEO score and the question suggestions.
  */
-export async function crawlSite(domain: string): Promise<{ home: Page; pages: Page[] } | null> {
+export interface CrawledSite {
+  home: Page;
+  pages: Page[];
+  /** Schema types read from the site's Google Tag Manager container(s). */
+  tagManagerTypes: Set<string>;
+}
+
+export async function crawlSite(domain: string): Promise<CrawledSite | null> {
   // If the homepage has no structured data in its raw HTML, render it via
   // Firecrawl before concluding there is none (many sites inject schema by JS).
   const renderIfNoSchema = { retryRenderIf: (r: HTMLElement) => !hasStructuredData(r) };
@@ -90,19 +98,29 @@ export async function crawlSite(domain: string): Promise<{ home: Page; pages: Pa
       }
     }
   }
-  return { home, pages: [home, ...extras] };
+  const pages = [home, ...extras];
+  // Schema injected via Google Tag Manager is not in the served HTML; read it
+  // from the container(s) directly.
+  const tagManagerTypes = await tagManagerSchemaTypes(pages.map((p) => p.root));
+  return { home, pages, tagManagerTypes };
 }
 
 /**
  * Score on-page GEO readiness from already-crawled pages. A signal counts if
  * present on any page. Total is CONFIG.weights.geoReadiness (20).
  */
-export function computeGeo(home: Page, pages: Page[]): GeoReadiness {
+export function computeGeo(
+  home: Page,
+  pages: Page[],
+  tagManagerTypes: Set<string> = new Set(),
+): GeoReadiness {
   const maxScore = CONFIG.weights.geoReadiness;
   const anyPage = (fn: (p: Page) => boolean) => pages.some(fn);
 
   const types = new Set<string>();
   pages.forEach((p) => jsonLdTypes(p.root).forEach((t) => types.add(t)));
+  // Schema declared in the site's tag manager counts too.
+  tagManagerTypes.forEach((t) => types.add(t));
 
   const hasBusinessSchema = BUSINESS_TYPES.some((t) => types.has(t));
   const hasFaqSchema = types.has("faqpage") || types.has("question");
@@ -233,5 +251,5 @@ export async function analyzeGeo(domain: string): Promise<GeoReadiness> {
       signals: [],
     };
   }
-  return computeGeo(site.home, site.pages);
+  return computeGeo(site.home, site.pages, site.tagManagerTypes);
 }
