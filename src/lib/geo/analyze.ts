@@ -142,7 +142,7 @@ export function computeGeo(home: Page, pages: Page[]): GeoReadiness {
       points: 4,
       detail: hasBusinessSchema
         ? "Structured business data helps AI identify and quote you."
-        : "No Hotel or LocalBusiness schema in your crawlable HTML. If yours is added by JavaScript, add it to the page source too, as most AI crawlers do not run JavaScript.",
+        : "No Hotel or LocalBusiness schema in your crawlable HTML. If yours is injected by a tag manager or JavaScript, add it directly to the page source, because AI crawlers do not run JavaScript or accept cookie consent.",
     },
     {
       id: "faq-schema",
