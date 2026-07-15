@@ -16,6 +16,13 @@ import { CompetitorLeaderboard } from "./CompetitorLeaderboard";
 import { Recommendations } from "./Recommendations";
 import { VisibilityBar } from "./VisibilityBar";
 import { BrandCheckCard } from "./BrandCheckCard";
+import {
+  ProcessingScore,
+  FixesSkeleton,
+  LeaderboardSkeleton,
+  VisibilitySkeleton,
+  QuestionsSkeleton,
+} from "./Skeleton";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -358,14 +365,7 @@ function Results({
             </p>
           </>
         ) : (
-          <>
-            <ScoreDial value={0} />
-            <p className="mx-auto mt-6 max-w-md text-[15px] leading-relaxed text-muted">
-              Checking {progress.total} guest questions across AI search for{" "}
-              <span className="font-medium text-ink">{domain}</span>. {progress.done} of{" "}
-              {progress.total} done.
-            </p>
-          </>
+          <ProcessingScore domain={domain} done={progress.done} total={progress.total} />
         )}
       </div>
 
@@ -395,15 +395,26 @@ function Results({
         </div>
       )}
 
+      {/* Skeleton for fixes + visibility while the score is still computing */}
+      {!done && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="card p-6 sm:p-7">
+            <h3 className="mb-1 font-display text-[19px] font-semibold text-ink">Your priority fixes</h3>
+            <p className="mb-4 text-[13.5px] text-muted">Working out where to start...</p>
+            <FixesSkeleton />
+          </div>
+          <div className="card p-6 sm:p-7">
+            <h3 className="mb-4 text-[15px] font-semibold text-ink">Where your visibility comes from</h3>
+            <VisibilitySkeleton />
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Per-question results */}
         <div className="card p-6 sm:p-7">
           <h3 className="mb-4 text-[15px] font-semibold text-ink">Question by question</h3>
-          {qs.length ? (
-            <QuestionRows questions={qs} />
-          ) : (
-            <p className="text-[14px] text-muted">Preparing your questions...</p>
-          )}
+          {qs.length ? <QuestionRows questions={qs} /> : <QuestionsSkeleton />}
         </div>
 
         <div className="space-y-6">
@@ -415,7 +426,7 @@ function Results({
             {sc ? (
               <CompetitorLeaderboard competitors={sc.competitors} total={sc.questionCount} />
             ) : (
-              <p className="text-[14px] text-muted">Building the leaderboard as answers land...</p>
+              <LeaderboardSkeleton />
             )}
           </div>
 

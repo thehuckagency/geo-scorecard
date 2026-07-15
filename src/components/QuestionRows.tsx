@@ -1,6 +1,7 @@
 "use client";
 import { CONFIG } from "@/lib/config";
 import type { EngineResult, QuestionResult } from "@/lib/types";
+import { Skeleton } from "./Skeleton";
 
 function EngineChip({ e }: { e: EngineResult }) {
   const label = CONFIG.engineLabels[e.engine];
@@ -66,9 +67,16 @@ export function QuestionRows({ questions }: { questions: QuestionResult[] }) {
                 </div>
 
                 {q.status === "pending" || q.status === "running" ? (
-                  <p className="mt-1.5 text-[13px] text-muted">
-                    {q.status === "running" ? "Checking AI search..." : "Queued"}
-                  </p>
+                  <>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Skeleton className="h-[26px] w-[92px] rounded-full" />
+                      <Skeleton className="h-[26px] w-[96px] rounded-full" />
+                      <Skeleton className="h-[26px] w-[84px] rounded-full" />
+                    </div>
+                    <p className="mt-2 text-[12.5px] text-muted">
+                      {q.status === "running" ? "Checking AI search..." : "Queued"}
+                    </p>
+                  </>
                 ) : (
                   <>
                     <div className="mt-2 flex flex-wrap gap-1.5">
