@@ -5,6 +5,7 @@ import { analyzeGeo } from "@/lib/geo/analyze";
 import { runBrandCheck, runQuestion } from "@/lib/engines";
 import { bestPosition, citedAny, computeScorecard } from "@/lib/scoring";
 import { postLead } from "@/lib/webhook";
+import { sendScorecardEmail } from "@/lib/email";
 import type { Job } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -87,7 +88,10 @@ export async function POST(req: Request) {
     job.status = "done";
     await touch();
 
-    job.webhookSent = await postLead(job);
+    // Post to the lead webhook and email the scorecard to the lead in parallel.
+    const [webhookSent, emailSent] = await Promise.all([postLead(job), sendScorecardEmail(job)]);
+    job.webhookSent = webhookSent;
+    job.emailSent = emailSent;
     await touch();
 
     return NextResponse.json({ ok: true, status: "done" });

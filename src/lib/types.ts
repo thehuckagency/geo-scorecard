@@ -134,4 +134,6 @@ export interface Job {
   error?: string;
   /** Whether the completed scorecard has been posted to the lead webhook. */
   webhookSent?: boolean;
+  /** Whether the scorecard email was sent to the lead. */
+  emailSent?: boolean;
 }
